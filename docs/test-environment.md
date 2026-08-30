@@ -47,14 +47,24 @@ signs.
 
 ## SteamVR
 
-SteamVR and its log paths were not visible in the development account during
-this capture. Record the branch, version, build ID, `vrserver.txt`,
-`vrcompositor.txt`, and `vrpathreg` paths before attempting driver registration.
+- Native Linux SteamVR app ID: `250820`.
+- Installed build ID: `23791826`.
+- Runtime: `/home/toyoshim/.local/share/Steam/steamapps/common/SteamVR`.
+- OpenVR config: `/home/toyoshim/.local/share/Steam/config`.
+- SteamVR logs: `/home/toyoshim/.local/share/Steam/logs`.
+- `vrpathreg`: `bin/linux64/vrpathreg` below the runtime. Direct command-line
+  invocation requires the runtime's `bin/linux64` library search path.
+- External driver registration: `xrealone` resolves to
+  `/home/toyoshim/Work/vrealone/build-release/xrealone`.
+
+The driver was registered while `vrserver` and `vrcompositor` were stopped.
+Their log files had not yet been created; record the exact runtime version and
+first-load results after the initial SteamVR launch.
 
 ## Current blockers for Gate 1
 
 1. Verify the physical AMD Vulkan ICD outside the restricted build shell.
-2. Install or locate native Linux SteamVR and record its exact version.
+2. Launch SteamVR and verify that the registered driver loads without safe mode.
 3. Prove that `vrcompositor` leases `card1-DP-2` at 1920x1080@60 half SBS.
 4. Repeat the display gate on hardware capable of 3840x1080 full SBS before a
    release claims native per-eye transport resolution.

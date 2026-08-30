@@ -1,0 +1,18 @@
+{
+  "driver_xrealone": {
+    "enable": true,
+    "direct_mode": true,
+    "imu_address": "169.254.2.1:52998",
+    "display_width": 3840,
+    "display_height": 1080,
+    "render_width": 1920,
+    "render_height": 1080,
+    "display_frequency": 60.0,
+    "nominal_fov_degrees": 50.0,
+    "edid_vendor_id": 13895,
+    "edid_product_id": 16641,
+    "stale_pose_timeout_ms": 100,
+    "reconnect_initial_ms": 250,
+    "reconnect_max_ms": 5000
+  }
+}

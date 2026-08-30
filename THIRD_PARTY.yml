@@ -3,19 +3,21 @@ project_license: Apache-2.0
 dependencies:
   - name: OpenVR
     source: https://github.com/ValveSoftware/openvr
-    revision: null
+    revision: 0924064316de3effbcd1acf1e309182a2deb1c05
+    version: 2.15.6
     license: BSD-3-Clause
-    usage: planned-direct-build-dependency
+    usage: build-fetched-header-dependency
     imported: false
   - name: xreal_one_driver
     source: https://github.com/rohitsangwan01/xreal_one_driver
-    revision: null
+    revision: 3e912315ec16e94e9a47688770d649cfef293624
     license: MIT
-    usage: planned-static-library
+    usage: build-fetched-static-library
     imported: false
   - name: Fusion
     source: https://github.com/xioTechnologies/Fusion
-    revision: null
+    revision: 9325424011892abacc0ce42b8bb1a8ae20264b9b
+    version: 1.3.3
     license: MIT
     usage: planned-static-library
     imported: false
@@ -26,6 +28,14 @@ dependencies:
     upstream_license_expression: MIT OR Unlicense
     usage: planned-transitive-rust-dependency
     imported: false
+    checksum: 1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b
+  - name: Rust standard library/runtime
+    source: https://github.com/rust-lang/rust
+    revision: 1.93.1
+    license: Apache-2.0 OR MIT
+    usage: transitive-static-runtime
+    imported: false
+    note: Release artifact inventory and component-specific notices remain mandatory.
 reference_only:
   - name: XRLinuxDriver
     source: https://github.com/wheaney/XRLinuxDriver

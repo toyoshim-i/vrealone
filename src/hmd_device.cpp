@@ -1,0 +1,114 @@
+// SPDX-License-Identifier: Apache-2.0
+#include "hmd_device.hpp"
+
+#include <algorithm>
+#include <cstring>
+
+namespace vrealone {
+
+HmdDevice::HmdDevice(DisplayConfig display_config)
+    : display_config_(display_config), display_component_(display_config) {}
+
+vr::EVRInitError HmdDevice::Activate(const std::uint32_t object_id) {
+  device_index_.store(object_id);
+  const auto container =
+      vr::VRProperties()->TrackedDeviceToPropertyContainer(object_id);
+  vr::VRProperties()->SetStringProperty(container, vr::Prop_ManufacturerName_String,
+                                        "XREAL");
+  vr::VRProperties()->SetStringProperty(container, vr::Prop_ModelNumber_String,
+                                        "XREAL One");
+  vr::VRProperties()->SetStringProperty(container,
+                                        vr::Prop_SerialNumber_String,
+                                        serial_number_.c_str());
+  vr::VRProperties()->SetFloatProperty(container, vr::Prop_DisplayFrequency_Float,
+                                       display_config_.frequency_hz);
+  vr::VRProperties()->SetFloatProperty(
+      container, vr::Prop_SecondsFromVsyncToPhotons_Float, 0.0F);
+  vr::VRProperties()->SetBoolProperty(container, vr::Prop_IsOnDesktop_Bool,
+                                      !display_config_.direct_mode);
+  vr::VRProperties()->SetBoolProperty(container, vr::Prop_WillDriftInYaw_Bool,
+                                      true);
+  if (display_config_.edid_vendor_id != 0) {
+    vr::VRProperties()->SetInt32Property(
+        container, vr::Prop_EdidVendorID_Int32,
+        static_cast<std::int32_t>(display_config_.edid_vendor_id));
+  }
+  if (display_config_.edid_product_id != 0) {
+    vr::VRProperties()->SetInt32Property(
+        container, vr::Prop_EdidProductID_Int32,
+        static_cast<std::int32_t>(display_config_.edid_product_id));
+  }
+  return vr::VRInitError_None;
+}
+
+void HmdDevice::Deactivate() {
+  device_index_.store(vr::k_unTrackedDeviceIndexInvalid);
+}
+
+void HmdDevice::EnterStandby() {}
+
+void* HmdDevice::GetComponent(const char* name_and_version) {
+  if (name_and_version != nullptr &&
+      std::strcmp(name_and_version, vr::IVRDisplayComponent_Version) == 0) {
+    return &display_component_;
+  }
+  return nullptr;
+}
+
+void HmdDevice::DebugRequest(const char* request, char* response,
+                             const std::uint32_t response_size) {
+  if (request != nullptr && std::strcmp(request, "recenter") == 0) {
+    recenter_.SetOrigin(pose_store_.Read().orientation);
+    WriteResponse(response, response_size, "ok");
+    return;
+  }
+  if (request != nullptr && std::strcmp(request, "status") == 0) {
+    WriteResponse(response, response_size, "display-probe");
+    return;
+  }
+  WriteResponse(response, response_size, "unknown request");
+}
+
+vr::DriverPose_t HmdDevice::GetPose() {
+  const auto snapshot = pose_store_.Read();
+  const auto orientation = recenter_.Apply(snapshot.orientation);
+  vr::DriverPose_t pose{};
+  pose.qWorldFromDriverRotation.w = 1.0;
+  pose.qDriverFromHeadRotation.w = 1.0;
+  pose.qRotation = {orientation.w, orientation.x, orientation.y,
+                    orientation.z};
+  pose.vecAngularVelocity[0] = snapshot.angular_velocity_rad_s[0];
+  pose.vecAngularVelocity[1] = snapshot.angular_velocity_rad_s[1];
+  pose.vecAngularVelocity[2] = snapshot.angular_velocity_rad_s[2];
+
+  // Gate 1 deliberately publishes a static valid pose. The sensor milestone will
+  // replace this with freshness and calibration state checks.
+  pose.poseIsValid = true;
+  pose.deviceIsConnected = true;
+  pose.result = vr::TrackingResult_Running_OK;
+  pose.willDriftInYaw = true;
+  pose.shouldApplyHeadModel = false;
+  return pose;
+}
+
+void HmdDevice::RunFrame() {
+  const auto index = device_index_.load();
+  if (index != vr::k_unTrackedDeviceIndexInvalid) {
+    vr::VRServerDriverHost()->TrackedDevicePoseUpdated(index, GetPose(),
+                                                       sizeof(vr::DriverPose_t));
+  }
+}
+
+const std::string& HmdDevice::SerialNumber() const { return serial_number_; }
+
+void HmdDevice::WriteResponse(char* response, const std::uint32_t response_size,
+                              const char* text) const {
+  if (response == nullptr || response_size == 0) {
+    return;
+  }
+  const auto length = std::min<std::size_t>(std::strlen(text), response_size - 1);
+  std::memcpy(response, text, length);
+  response[length] = '\0';
+}
+
+}  // namespace vrealone

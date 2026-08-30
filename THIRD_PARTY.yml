@@ -1,0 +1,43 @@
+schema_version: 1
+project_license: Apache-2.0
+dependencies:
+  - name: OpenVR
+    source: https://github.com/ValveSoftware/openvr
+    revision: null
+    license: BSD-3-Clause
+    usage: planned-direct-build-dependency
+    imported: false
+  - name: xreal_one_driver
+    source: https://github.com/rohitsangwan01/xreal_one_driver
+    revision: null
+    license: MIT
+    usage: planned-static-library
+    imported: false
+  - name: Fusion
+    source: https://github.com/xioTechnologies/Fusion
+    revision: null
+    license: MIT
+    usage: planned-static-library
+    imported: false
+  - name: byteorder
+    source: https://github.com/BurntSushi/byteorder
+    revision: 1.5.0
+    license: MIT
+    upstream_license_expression: MIT OR Unlicense
+    usage: planned-transitive-rust-dependency
+    imported: false
+reference_only:
+  - name: XRLinuxDriver
+    source: https://github.com/wheaney/XRLinuxDriver
+    observed_license: GPL-3.0
+  - name: psvr2-linux-adapter
+    source: https://github.com/unterschall/psvr2-linux-adapter
+    observed_license: GPL-2.0
+  - name: OpenVR-xrealAirGlassesHMD
+    source: https://github.com/wheaney/OpenVR-xrealAirGlassesHMD
+    observed_license: Unlicense
+    note: Submodules and upstream-derived files require separate review.
+  - name: opentrack
+    source: https://github.com/opentrack/opentrack
+    observed_license: Unlicense
+    note: Bundled components require separate review.

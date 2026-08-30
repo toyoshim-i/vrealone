@@ -22,7 +22,9 @@ struct Projection {
 };
 
 struct DisplayConfig {
-  std::uint32_t width = 3840;
+  // Encoded display width. The development default is half SBS: two 960-wide
+  // viewports in a 1920-wide mode, expanded horizontally by the glasses.
+  std::uint32_t width = 1920;
   std::uint32_t height = 1080;
   std::uint32_t render_width = 1920;
   std::uint32_t render_height = 1080;

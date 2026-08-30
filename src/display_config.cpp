@@ -27,8 +27,11 @@ Projection DisplayConfig::EyeProjection() const {
   constexpr float kPi = 3.14159265358979323846F;
   const auto horizontal_tangent =
       std::tan(horizontal_fov_degrees * kPi / 360.0F);
-  const auto eye_aspect = static_cast<float>(width / 2) /
-                          static_cast<float>(height);
+  // Projection describes the decoded optical image, not the encoded output
+  // viewport. This distinction is essential for 960x1080 half SBS output that
+  // the glasses expand to a 1920x1080 image for each eye.
+  const auto eye_aspect = static_cast<float>(render_width) /
+                          static_cast<float>(render_height);
   const auto vertical_tangent = horizontal_tangent / eye_aspect;
   return {.left = -horizontal_tangent,
           .right = horizontal_tangent,

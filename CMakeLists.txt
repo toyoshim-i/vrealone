@@ -72,7 +72,25 @@ if(VREALONE_BUILD_DRIVER)
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/xrealone/bin/linux64"
   )
 
-  file(COPY resources/xrealone/ DESTINATION "${CMAKE_BINARY_DIR}/xrealone")
+  file(MAKE_DIRECTORY
+    "${CMAKE_BINARY_DIR}/xrealone/resources/settings"
+    "${CMAKE_BINARY_DIR}/xrealone/examples"
+  )
+  configure_file(
+    resources/xrealone/driver.vrdrivermanifest
+    "${CMAKE_BINARY_DIR}/xrealone/driver.vrdrivermanifest"
+    COPYONLY
+  )
+  configure_file(
+    resources/xrealone/resources/settings/default.vrsettings
+    "${CMAKE_BINARY_DIR}/xrealone/resources/settings/default.vrsettings"
+    COPYONLY
+  )
+  configure_file(
+    resources/xrealone/examples/full-sbs.vrsettings
+    "${CMAKE_BINARY_DIR}/xrealone/examples/full-sbs.vrsettings"
+    COPYONLY
+  )
 endif()
 
 if(BUILD_TESTING)

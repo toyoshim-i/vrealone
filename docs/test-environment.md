@@ -25,8 +25,11 @@ host and is not a statement of minimum requirements.
 - Two USB network interfaces appeared and reported link up:
   `enxfcd2b6adcc6c` and `enxfcd2b6adcc6d`.
 - The display appeared on `card1-DP-2`, owned by the AMD GPU.
-- At first connection, DRM exposed only `640x480`; the glasses had not yet been
-  confirmed in 3840x1080 SBS mode.
+- In full-SBS mode, DRM exposed only `640x480`, the glasses became inoperable,
+  and the host reported that the DP display was not detected at 90 Hz.
+- In half-SBS mode, `card1-DP-2` remained connected and exposed 1920x1080. The
+  glasses stayed usable at FHD/60 Hz, so half SBS is the development profile for
+  this host.
 - EDID identity: manufacturer `MRG`, raw vendor ID `0x3647`, product ID
   `0x4101`.
 - USB network addresses: `169.254.1.10/24` and `169.254.2.10/24`.
@@ -50,7 +53,8 @@ this capture. Record the branch, version, build ID, `vrserver.txt`,
 
 ## Current blockers for Gate 1
 
-1. Switch the glasses into 3840x1080 SBS mode and recapture DRM modes.
-2. Verify the physical AMD Vulkan ICD outside the restricted build shell.
-3. Install or locate native Linux SteamVR and record its exact version.
-4. Prove that `vrcompositor` leases `card1-DP-2`.
+1. Verify the physical AMD Vulkan ICD outside the restricted build shell.
+2. Install or locate native Linux SteamVR and record its exact version.
+3. Prove that `vrcompositor` leases `card1-DP-2` at 1920x1080@60 half SBS.
+4. Repeat the display gate on hardware capable of 3840x1080 full SBS before a
+   release claims native per-eye transport resolution.

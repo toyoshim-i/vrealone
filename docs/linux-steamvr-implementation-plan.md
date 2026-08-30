@@ -13,6 +13,17 @@ The Linux plan is directionally correct: native SteamVR removes the macOS/Wine G
 
 The project should proceed only after Gate 1 below demonstrates that SteamVR can render to the physical XREAL connector in direct mode.
 
+### Initial-host half-SBS decision
+
+Hardware measurements on the initial development host changed the order of display validation. Full SBS caused the connector to fall back to 640x480, while half SBS remained connected at 1920x1080 and kept the glasses operational at 60 Hz. Development therefore uses half SBS as an explicit interim profile:
+
+- Encoded display: 1920x1080 total.
+- Encoded eye viewport: 960x1080 per eye.
+- Recommended render target: 1920x1080 per eye.
+- Optical projection aspect: 16:9 per eye, because the glasses expand each half-width encoded image horizontally.
+
+This profile is sufficient to validate DRM leasing, OpenVR lifecycle, tracking, recentering, and application compatibility. It does not replace the release gate for 3840x1080 full SBS on capable hardware.
+
 ## Validated building blocks
 
 | Area | Evidence | Conclusion |
@@ -131,6 +142,8 @@ Create `docs/test-environment.md` from these observations. Avoid treating switch
 ### Gate 1: Prove direct-mode display acquisition
 
 This gate comes before production IMU work because it is the only unresolved platform-level risk.
+
+On the initial host, perform steps 1 through 7 first with the measured 1920x1080@60 half-SBS profile. Successful half-SBS acquisition permits sensor and lifecycle development to continue, but the full Gate 1 exit criterion still requires repetition at 3840x1080 on capable hardware.
 
 1. Enable SBS on the glasses and verify a 3840x1080 mode with `modetest`, `xrandr`, or compositor display tools.
 2. Read the raw EDID from `/sys/class/drm/card*-*/edid`; store `edid-decode` output in test notes and extract the vendor and product IDs used by OpenVR.

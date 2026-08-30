@@ -5,7 +5,8 @@ development for XREAL One glasses. The current milestone provides:
 
 - a buildable OpenVR HMD driver with a direct-display component;
 - measured XREAL One USB and EDID identification;
-- 3840x1080 side-by-side viewport and conservative 60 Hz display defaults;
+- a measured 1920x1080@60 half-SBS development profile, with an optional
+  3840x1080 full-SBS profile;
 - a DRM/EDID and IMU diagnostic probe;
 - quaternion recentering, thread-safe pose snapshots, and a Fusion AHRS wrapper;
 - deterministic tests that do not require SteamVR or connected hardware.
@@ -35,9 +36,12 @@ cmake -S . -B build -G Ninja \
   -DVREALONE_FUSION_SOURCE_DIR=/path/to/Fusion
 ```
 
-The SteamVR driver tree is produced below `build/xrealone/`. Do not register it
-until the glasses report 3840x1080 SBS and the measured EDID values match the
-defaults.
+The SteamVR driver tree is produced below `build/xrealone/`. The default output
+uses half SBS: two encoded 960x1080 eye viewports, each horizontally expanded
+by the glasses to its native 1920x1080 optical image. SteamVR still renders each
+eye at 1920x1080 before output scaling. A full-SBS override is provided at
+`resources/xrealone/examples/full-sbs.vrsettings`, but remains unvalidated on
+the initial host.
 
 ## Hardware probes
 
@@ -62,4 +66,6 @@ public issue.
 See [the implementation plan](docs/linux-steamvr-implementation-plan.md) and
 [the recorded test host](docs/test-environment.md). Full Gate 1 completion still
 requires SteamVR to DRM-lease the XREAL connector and render a stable SBS image.
+Half SBS is sufficient for driver and tracking development; full SBS remains a
+release-quality display gate.
 The repository contains no source copied from the GPL reference-only projects.

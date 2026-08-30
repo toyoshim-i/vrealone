@@ -3,7 +3,7 @@
     "enable": true,
     "direct_mode": true,
     "imu_address": "169.254.2.1:52998",
-    "display_width": 3840,
+    "display_width": 1920,
     "display_height": 1080,
     "render_width": 1920,
     "render_height": 1080,

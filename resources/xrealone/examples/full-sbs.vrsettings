@@ -1,0 +1,9 @@
+{
+  "driver_xrealone": {
+    "display_width": 3840,
+    "display_height": 1080,
+    "render_width": 1920,
+    "render_height": 1080,
+    "display_frequency": 60.0
+  }
+}

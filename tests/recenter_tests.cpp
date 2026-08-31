@@ -15,4 +15,15 @@ void RunRecenterTests() {
   CheckNear(centered.x, 0.0, 1e-12, "recentered orientation x");
   CheckNear(centered.y, 0.0, 1e-12, "recentered orientation y");
   CheckNear(centered.z, 0.0, 1e-12, "recentered orientation z");
+
+  const Quaternion yaw90{kSqrtHalf, 0.0, kSqrtHalf, 0.0};
+  recenter.SetOrigin(yaw90);
+  const auto centered_vector =
+      recenter.ApplyVector({-1.0, 0.0, 0.0});
+  CheckNear(centered_vector[0], 0.0, 1e-12,
+            "recentered vector x");
+  CheckNear(centered_vector[1], 0.0, 1e-12,
+            "recentered vector y");
+  CheckNear(centered_vector[2], -1.0, 1e-12,
+            "recentered vector z");
 }

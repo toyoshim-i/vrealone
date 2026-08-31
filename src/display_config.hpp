@@ -31,8 +31,8 @@ struct DisplayConfig {
   float frequency_hz = 60.0F;
   float horizontal_fov_degrees = 50.0F;
   bool direct_mode = true;
-  std::uint32_t edid_vendor_id = 0;
-  std::uint32_t edid_product_id = 0;
+  std::uint32_t edid_vendor_id = 0x3647;
+  std::uint32_t edid_product_id = 0x4101;
 
   [[nodiscard]] bool IsValid() const;
   [[nodiscard]] Rect EyeViewport(Eye eye) const;

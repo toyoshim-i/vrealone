@@ -2,9 +2,13 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 
 #include <openvr_driver.h>
 
@@ -12,11 +16,19 @@
 #include "tracking/pose_snapshot.hpp"
 #include "tracking/recenter.hpp"
 
+#if VREALONE_HAS_SENSOR
+#include "tracking/fusion_tracker.hpp"
+#endif
+
 namespace vrealone {
 
 class HmdDevice final : public vr::ITrackedDeviceServerDriver {
  public:
-  explicit HmdDevice(DisplayConfig display_config);
+  HmdDevice(DisplayConfig display_config, std::string imu_address,
+            std::chrono::milliseconds stale_pose_timeout,
+            std::chrono::milliseconds reconnect_initial,
+            std::chrono::milliseconds reconnect_max);
+  ~HmdDevice();
 
   vr::EVRInitError Activate(std::uint32_t object_id) override;
   void Deactivate() override;
@@ -32,13 +44,30 @@ class HmdDevice final : public vr::ITrackedDeviceServerDriver {
  private:
   void WriteResponse(char* response, std::uint32_t response_size,
                      const char* text) const;
+  void StartSensor();
+  void StopSensor();
+#if VREALONE_HAS_SENSOR
+  void SensorLoop(std::stop_token stop_token);
+  bool WaitForReconnect(std::stop_token stop_token,
+                        std::chrono::milliseconds duration);
+#endif
 
   DisplayConfig display_config_;
   DisplayComponent display_component_;
   tracking::PoseStore pose_store_;
   tracking::Recenter recenter_;
+  std::string imu_address_;
+  std::chrono::milliseconds stale_pose_timeout_;
+  std::chrono::milliseconds reconnect_initial_;
+  std::chrono::milliseconds reconnect_max_;
   std::string serial_number_ = "XREALONE-UNPROBED";
   std::atomic<std::uint32_t> device_index_{vr::k_unTrackedDeviceIndexInvalid};
+#if VREALONE_HAS_SENSOR
+  tracking::FusionTracker fusion_tracker_;
+  std::jthread sensor_thread_;
+  std::mutex reconnect_mutex_;
+  std::condition_variable_any reconnect_condition_;
+#endif
 };
 
 }  // namespace vrealone

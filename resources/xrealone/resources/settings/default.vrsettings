@@ -2,6 +2,7 @@
   "driver_xrealone": {
     "enable": true,
     "direct_mode": true,
+    "allow_ambiguous_display_selection": false,
     "imu_address": "169.254.2.1:52998",
     "display_width": 1920,
     "display_height": 1080,

@@ -18,8 +18,10 @@ inline void CheckNear(const double actual, const double expected,
 }
 
 void RunDisplayConfigTests();
+void RunCoordinateTransformTests();
 void RunEdidTests();
 void RunQuaternionTests();
+void RunPoseSnapshotTests();
 void RunRecenterTests();
 #if VREALONE_HAS_FUSION
 void RunFusionTrackerTests();

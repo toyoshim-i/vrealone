@@ -13,4 +13,9 @@ Quaternion Recenter::Apply(const Quaternion& current) const {
   return (offset_ * current.Normalized()).Normalized();
 }
 
+std::array<double, 3> Recenter::ApplyVector(
+    const std::array<double, 3>& current) const {
+  return offset_.Rotate(current);
+}
+
 }  // namespace vrealone::tracking

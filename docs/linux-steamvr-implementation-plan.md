@@ -165,6 +165,16 @@ Keep `direct_mode=false` as a developer-only diagnostic option. Do not plan the 
 
 **No-go criterion:** if the connector cannot be acquired on the target GPU after EDID, Vulkan ICD, session, and DRM permission checks, stop and document the failure. Do not begin an `IVRDriverDirectModeComponent` or Vulkan WSI interception implementation without a separate design decision; those are substantially larger projects.
 
+#### Initial-host Gate 1 result
+
+The reference AMD/Xorg host successfully acquired XREAL One as RandR output
+`0x54` at 1920x1080@60 when every competing display was physically
+disconnected. SteamVR Home rendered on the glasses in direct mode. SteamVR
+2.16.7 still scans modes belonging to disconnected, `non-desktop` outputs, so
+property changes alone cannot disambiguate two FHD connectors. The driver must
+default to refusing ambiguous direct-display configurations, and supervised
+Gate 1 tests must run `xrealone_probe --check-direct-display` before launch.
+
 ### Gate 2: Validate the sensor path independently
 
 Implement `tools/xrealone_probe` before loading sensor code into `vrserver`.
@@ -177,6 +187,33 @@ Implement `tools/xrealone_probe` before loading sensor code into `vrserver`.
 6. Log sensor-to-host latency using a monotonic host timestamp captured immediately after `xo_next` returns.
 
 **Exit criterion:** the probe runs for 60 minutes, survives a cable reconnect, produces a normalized quaternion without NaNs, and shows correct yaw, pitch, and roll directions.
+
+#### Initial-host Gate 2 progress
+
+The USB network path and default TCP endpoint are working. Captures of 500 and
+5,000 samples ran at approximately 998--1,000 Hz without timestamp rollback,
+and deterministic Fusion tests produce normalized finite quaternions. The
+driver now has a bounded sensor thread, startup calibration state, stale-pose
+invalidation, finite-sample rejection, reconnect backoff, and clean join logic.
+Both sensor-enabled and sensor-disabled driver builds pass their test suites.
+
+The Gate remains open. An initial controlled leftward yaw capture mapped to the
+parser's positive Z axis and integrated to 1.717. An upward pitch mapped to
+negative X and integrated to -1.383; the simultaneous gravity-vector change
+confirmed the physical rotation. Both are consistent with radians per second
+for approximate 90-degree turns. A right-ear-down roll subsequently mapped to
+negative Y and integrated to -1.539, completing the unit/sign matrix. The
+implementation maps parser axial vectors to OpenVR as `[-x, z, y]` and covers
+the corresponding quaternion basis change with deterministic tests.
+An independent fused tracking probe now follows Fusion's own startup flag,
+recenters when it changes to running at approximately three seconds, and emits
+OpenVR pitch/yaw/roll rotation-vector components for physical validation.
+An end-to-end physical run confirmed positive OpenVR Y for left yaw, positive
+OpenVR X for upward pitch, and negative OpenVR Z for right-ear-down roll after
+Fusion and recentering.
+Long-duration and cable-reconnect probes remain.
+Until those checks pass, do not enable the live pose path in SteamVR merely to
+inspect motion subjectively.
 
 ### Gate 3: Implement the OpenVR device lifecycle
 

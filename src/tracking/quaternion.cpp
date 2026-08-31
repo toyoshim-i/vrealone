@@ -27,6 +27,14 @@ Quaternion Quaternion::Inverse() const {
           -z / norm_squared};
 }
 
+std::array<double, 3> Quaternion::Rotate(
+    const std::array<double, 3>& vector) const {
+  const auto unit = Normalized();
+  const Quaternion pure{0.0, vector[0], vector[1], vector[2]};
+  const auto rotated = unit * pure * unit.Inverse();
+  return {rotated.x, rotated.y, rotated.z};
+}
+
 Quaternion operator*(const Quaternion& left, const Quaternion& right) {
   return {
       left.w * right.w - left.x * right.x - left.y * right.y -

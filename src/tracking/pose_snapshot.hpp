@@ -17,6 +17,11 @@ struct PoseSnapshot {
   TrackingState state = TrackingState::disconnected;
 };
 
+[[nodiscard]] bool IsPoseFresh(
+    const PoseSnapshot& snapshot,
+    std::chrono::steady_clock::time_point now,
+    std::chrono::steady_clock::duration maximum_age);
+
 class PoseStore {
  public:
   void Publish(const PoseSnapshot& snapshot);

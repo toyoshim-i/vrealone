@@ -39,6 +39,7 @@ PoseSnapshot FusionTracker::Update(const float gyro_rad_s[3],
   gyro_degrees = FusionBiasUpdate(&bias_, gyro_degrees);
   FusionAhrsUpdateNoMagnetometer(&ahrs_, gyro_degrees, acceleration);
   const auto quaternion = FusionAhrsGetQuaternion(&ahrs_);
+  const auto flags = FusionAhrsGetFlags(&ahrs_);
 
   const Quaternion orientation{quaternion.element.w, quaternion.element.x,
                                quaternion.element.y, quaternion.element.z};
@@ -46,7 +47,9 @@ PoseSnapshot FusionTracker::Update(const float gyro_rad_s[3],
       .orientation = orientation.Normalized(),
       .angular_velocity_rad_s = {gyro_rad_s[0], gyro_rad_s[1], gyro_rad_s[2]},
       .received_at = std::chrono::steady_clock::now(),
-      .state = TrackingState::running,
+      .state = flags.startup || flags.overrangeRecovery
+                   ? TrackingState::calibrating
+                   : TrackingState::running,
   };
 }
 

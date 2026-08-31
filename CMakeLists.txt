@@ -20,6 +20,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(vrealone_core STATIC
   src/display_config.cpp
   src/platform/edid.cpp
+  src/tracking/coordinate_transform.cpp
   src/tracking/pose_snapshot.cpp
   src/tracking/quaternion.cpp
   src/tracking/recenter.cpp
@@ -48,7 +49,13 @@ if(VREALONE_ENABLE_SENSOR)
   target_compile_options(vrealone_fusion_tracker PRIVATE
     -Wall -Wextra -Wpedantic -Werror
   )
-  target_link_libraries(xrealone_probe PRIVATE xreal_one_driver)
+  set_target_properties(vrealone_fusion_tracker PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+  )
+  target_link_libraries(xrealone_probe PRIVATE
+    vrealone_fusion_tracker
+    xreal_one_driver
+  )
   target_compile_definitions(xrealone_probe PRIVATE VREALONE_HAS_SENSOR=1)
 endif()
 
@@ -62,6 +69,13 @@ if(VREALONE_BUILD_DRIVER)
     src/hmd_device.cpp
   )
   target_link_libraries(driver_xrealone PRIVATE vrealone_core)
+  if(VREALONE_ENABLE_SENSOR)
+    target_link_libraries(driver_xrealone PRIVATE
+      vrealone_fusion_tracker
+      xreal_one_driver
+    )
+    target_compile_definitions(driver_xrealone PRIVATE VREALONE_HAS_SENSOR=1)
+  endif()
   target_include_directories(driver_xrealone SYSTEM PRIVATE "${OPENVR_INCLUDE_DIR}")
   target_compile_definitions(driver_xrealone PRIVATE LINUX POSIX)
   target_compile_options(driver_xrealone PRIVATE
@@ -98,6 +112,8 @@ if(BUILD_TESTING)
     tests/display_config_tests.cpp
     tests/edid_tests.cpp
     tests/main.cpp
+    tests/coordinate_transform_tests.cpp
+    tests/pose_snapshot_tests.cpp
     tests/quaternion_tests.cpp
     tests/recenter_tests.cpp
   )

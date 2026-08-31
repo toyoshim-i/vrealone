@@ -7,11 +7,13 @@
 int main() {
   try {
     RunCoordinateTransformTests();
+    RunControlServerTests();
     RunDisplayConfigTests();
     RunEdidTests();
     RunQuaternionTests();
     RunPoseSnapshotTests();
     RunRecenterTests();
+    RunTapDetectorTests();
 #if VREALONE_HAS_FUSION
     RunFusionTrackerTests();
 #endif

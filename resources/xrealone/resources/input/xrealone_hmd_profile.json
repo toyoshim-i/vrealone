@@ -1,0 +1,18 @@
+{
+  "jsonid": "input_profile",
+  "controller_type": "xrealone_hmd",
+  "input_bindingui_mode": "hmd",
+  "input_source": {
+    "/input/select": {
+      "type": "button",
+      "click": true,
+      "order": 1
+    }
+  },
+  "default_bindings": [
+    {
+      "app_key": "openvr.component.vrcompositor",
+      "binding_url": "xrealone_dashboard_binding.json"
+    }
+  ]
+}

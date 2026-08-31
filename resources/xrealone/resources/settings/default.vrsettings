@@ -14,6 +14,10 @@
     "edid_product_id": 16641,
     "stale_pose_timeout_ms": 100,
     "reconnect_initial_ms": 250,
-    "reconnect_max_ms": 5000
+    "reconnect_max_ms": 5000,
+    "tap_input_enabled": false,
+    "tap_audio_device": "pulse",
+    "tap_audio_peak_threshold": 80000000,
+    "tap_imu_deviation_m_s2": 3.0
   }
 }

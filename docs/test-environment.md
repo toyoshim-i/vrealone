@@ -155,6 +155,15 @@ Recovery must terminate already-running processes directly from the retained
 SSH session, then set `driver_xrealone.enable=false` and
 `steamvr.directDisplay=false` before reconnecting other displays.
 
+The first live-orientation SteamVR test successfully selected XREAL output
+`0x54` at 60 Hz, acquired it in direct mode, connected the IMU, and changed
+tracking from calibrating to running after approximately three seconds. Visual
+head tracking appeared correct in SteamVR Home. However, with XREAL as the only
+display and no controller, the user could not exit SteamVR or return to the
+desktop and again required SSH recovery. All subsequent tests must use
+`scripts/run-timed-steamvr-test.sh` so a foreground watchdog stops the runtime
+and restores disabled settings after a fixed duration.
+
 ## Current blockers for Gate 1
 
 1. Repeat the successful XREAL-only half-SBS acquisition for the required

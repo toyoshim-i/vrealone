@@ -19,15 +19,22 @@ namespace vrealone {
 HmdDevice::HmdDevice(DisplayConfig display_config, std::string imu_address,
                      const std::chrono::milliseconds stale_pose_timeout,
                      const std::chrono::milliseconds reconnect_initial,
-                     const std::chrono::milliseconds reconnect_max)
+                     const std::chrono::milliseconds reconnect_max,
+                     input::TapControlConfig tap_control_config)
     : display_config_(display_config),
       display_component_(display_config),
       imu_address_(std::move(imu_address)),
       stale_pose_timeout_(stale_pose_timeout),
       reconnect_initial_(reconnect_initial),
-      reconnect_max_(reconnect_max) {}
+      reconnect_max_(reconnect_max),
+      tap_control_config_(std::move(tap_control_config)),
+      audio_tap_input_(tap_control_config_.audio) {}
 
-HmdDevice::~HmdDevice() { StopSensor(); }
+HmdDevice::~HmdDevice() {
+  control_server_.Stop();
+  StopTapInput();
+  StopSensor();
+}
 
 vr::EVRInitError HmdDevice::Activate(const std::uint32_t object_id) {
   device_index_.store(object_id);
@@ -48,6 +55,12 @@ vr::EVRInitError HmdDevice::Activate(const std::uint32_t object_id) {
                                       !display_config_.direct_mode);
   vr::VRProperties()->SetBoolProperty(container, vr::Prop_WillDriftInYaw_Bool,
                                       true);
+  vr::VRProperties()->SetStringProperty(
+      container, vr::Prop_InputProfilePath_String,
+      "{xrealone}/input/xrealone_hmd_profile.json");
+  vr::VRProperties()->SetStringProperty(container,
+                                        vr::Prop_ControllerType_String,
+                                        "xrealone_hmd");
   if (display_config_.edid_vendor_id != 0) {
     vr::VRProperties()->SetInt32Property(
         container, vr::Prop_EdidVendorID_Int32,
@@ -58,12 +71,31 @@ vr::EVRInitError HmdDevice::Activate(const std::uint32_t object_id) {
         container, vr::Prop_EdidProductID_Int32,
         static_cast<std::int32_t>(display_config_.edid_product_id));
   }
+  if (vr::VRDriverInput()->CreateBooleanComponent(
+          container, "/input/select/click", &select_click_handle_) !=
+      vr::VRInputError_None) {
+    vr::VRDriverLog()->Log("xrealone: failed to create gaze select input");
+    select_click_handle_ = vr::k_ulInvalidInputComponentHandle;
+  }
+  if (!control_server_.Start(
+          control::DefaultSocketPath(),
+          [this](const control::Command command) {
+            return HandleControlCommand(command);
+          })) {
+    vr::VRDriverLog()->Log("xrealone: failed to start control socket");
+  } else {
+    vr::VRDriverLog()->Log("xrealone: control socket ready");
+  }
   StartSensor();
+  StartTapInput();
   return vr::VRInitError_None;
 }
 
 void HmdDevice::Deactivate() {
+  control_server_.Stop();
+  StopTapInput();
   StopSensor();
+  select_click_handle_ = vr::k_ulInvalidInputComponentHandle;
   device_index_.store(vr::k_unTrackedDeviceIndexInvalid);
 }
 
@@ -80,9 +112,8 @@ void* HmdDevice::GetComponent(const char* name_and_version) {
 void HmdDevice::DebugRequest(const char* request, char* response,
                              const std::uint32_t response_size) {
   if (request != nullptr && std::strcmp(request, "recenter") == 0) {
-    recenter_.SetOrigin(tracking::ParserOrientationToOpenVr(
-        pose_store_.Read().orientation));
-    WriteResponse(response, response_size, "ok");
+    recenter_requested_.store(true);
+    WriteResponse(response, response_size, "queued");
     return;
   }
   if (request != nullptr && std::strcmp(request, "status") == 0) {
@@ -146,12 +177,78 @@ vr::DriverPose_t HmdDevice::GetPose() {
 void HmdDevice::RunFrame() {
   const auto index = device_index_.load();
   if (index != vr::k_unTrackedDeviceIndexInvalid) {
+    if (recenter_requested_.exchange(false)) {
+      recenter_.SetOrigin(tracking::ParserOrientationToOpenVr(
+          pose_store_.Read().orientation));
+      vr::VRDriverLog()->Log("xrealone: orientation recentered");
+    }
+    if (select_click_handle_ != vr::k_ulInvalidInputComponentHandle) {
+      const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                              std::chrono::steady_clock::now().time_since_epoch())
+                              .count();
+      const bool pressed = now_ns < select_click_until_ns_.load();
+      vr::VRDriverInput()->UpdateBooleanComponent(select_click_handle_, pressed,
+                                                   0.0);
+    }
     vr::VRServerDriverHost()->TrackedDevicePoseUpdated(index, GetPose(),
                                                        sizeof(vr::DriverPose_t));
   }
 }
 
 const std::string& HmdDevice::SerialNumber() const { return serial_number_; }
+
+std::string HmdDevice::HandleControlCommand(const control::Command command) {
+  if (command == control::Command::recenter) {
+    recenter_requested_.store(true);
+    return "queued recenter";
+  }
+  if (command == control::Command::click) {
+    QueueSelectClick();
+    return "queued click";
+  }
+  if (command == control::Command::status) {
+    const auto state = pose_store_.Read().state;
+    if (state == tracking::TrackingState::running) {
+      return "running";
+    }
+    if (state == tracking::TrackingState::calibrating) {
+      return "calibrating";
+    }
+    return "disconnected";
+  }
+  return "unknown command";
+}
+
+void HmdDevice::StartTapInput() {
+  if (!tap_control_config_.enabled) {
+    return;
+  }
+  const bool started = audio_tap_input_.Start(
+      [this](const input::TapAction action) {
+        if (action == input::TapAction::click) {
+          QueueSelectClick();
+        } else if (action == input::TapAction::recenter) {
+          recenter_requested_.store(true);
+        }
+      },
+      [this] {
+        return std::chrono::steady_clock::time_point(
+            std::chrono::nanoseconds(last_imu_impact_ns_.load()));
+      });
+  vr::VRDriverLog()->Log(started ? "xrealone: tap input ready"
+                                 : "xrealone: tap input unavailable");
+}
+
+void HmdDevice::StopTapInput() { audio_tap_input_.Stop(); }
+
+void HmdDevice::QueueSelectClick() {
+  constexpr auto kClickDuration = std::chrono::milliseconds(150);
+  const auto until = std::chrono::steady_clock::now() + kClickDuration;
+  select_click_until_ns_.store(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          until.time_since_epoch())
+          .count());
+}
 
 #if VREALONE_HAS_SENSOR
 void HmdDevice::StartSensor() {
@@ -173,6 +270,8 @@ void HmdDevice::StopSensor() {
 
 void HmdDevice::SensorLoop(const std::stop_token stop_token) {
   auto reconnect_delay = reconnect_initial_;
+  input::ImuImpactDetector impact_detector(
+      tap_control_config_.imu_acceleration_deviation_m_s2);
   while (!stop_token.stop_requested()) {
     using Handle = std::unique_ptr<XrealOneHandle, decltype(&xo_free)>;
     Handle handle(xo_new_with_addr(imu_address_.c_str()), &xo_free);
@@ -187,6 +286,7 @@ void HmdDevice::SensorLoop(const std::stop_token stop_token) {
     }
 
     fusion_tracker_.Reset();
+    impact_detector.Reset();
     pose_store_.Publish({.received_at = std::chrono::steady_clock::now(),
                          .state = tracking::TrackingState::calibrating});
     vr::VRDriverLog()->Log("xrealone: IMU connected; calibrating");
@@ -202,6 +302,19 @@ void HmdDevice::SensorLoop(const std::stop_token stop_token) {
           std::isfinite(sample.accel[1]) && std::isfinite(sample.accel[2]);
       if (!finite) {
         continue;
+      }
+      const auto acceleration_magnitude = std::sqrt(
+          sample.accel[0] * sample.accel[0] +
+          sample.accel[1] * sample.accel[1] +
+          sample.accel[2] * sample.accel[2]);
+      constexpr float kStandardGravity = 9.80665F;
+      if (impact_detector.Observe(
+              std::chrono::steady_clock::now(),
+              std::abs(acceleration_magnitude - kStandardGravity))) {
+        last_imu_impact_ns_.store(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch())
+                .count());
       }
       reconnect_delay = reconnect_initial_;
       auto snapshot =

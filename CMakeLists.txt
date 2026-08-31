@@ -5,6 +5,7 @@ cmake_minimum_required(VERSION 3.24)
 project(vrealone VERSION 0.1.0 LANGUAGES C CXX)
 
 include(CTest)
+find_package(ALSA REQUIRED)
 
 option(VREALONE_BUILD_DRIVER "Build the SteamVR driver" ON)
 option(VREALONE_ENABLE_SENSOR "Build XREAL One sensor support" ON)
@@ -19,6 +20,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(vrealone_core STATIC
   src/display_config.cpp
+  src/control/control_server.cpp
+  src/input/tap_detector.cpp
   src/platform/edid.cpp
   src/tracking/coordinate_transform.cpp
   src/tracking/pose_snapshot.cpp
@@ -36,6 +39,18 @@ set_target_properties(vrealone_core PROPERTIES
 add_executable(xrealone_probe tools/xrealone_probe.cpp)
 target_link_libraries(xrealone_probe PRIVATE vrealone_core)
 target_compile_options(xrealone_probe PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(xrealone_ctl tools/xrealone_ctl.cpp)
+target_link_libraries(xrealone_ctl PRIVATE vrealone_core)
+target_compile_options(xrealone_ctl PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_library(vrealone_audio_input STATIC src/input/audio_tap_input.cpp)
+target_link_libraries(vrealone_audio_input PUBLIC vrealone_core ALSA::ALSA)
+target_include_directories(vrealone_audio_input PUBLIC src)
+target_compile_options(vrealone_audio_input PRIVATE
+  -Wall -Wextra -Wpedantic -Werror
+)
+set_target_properties(vrealone_audio_input PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(VREALONE_ENABLE_SENSOR)
   include(cmake/SensorDependency.cmake)
@@ -57,6 +72,15 @@ if(VREALONE_ENABLE_SENSOR)
     xreal_one_driver
   )
   target_compile_definitions(xrealone_probe PRIVATE VREALONE_HAS_SENSOR=1)
+
+  add_executable(xrealone_tap_probe tools/xrealone_tap_probe.cpp)
+  target_link_libraries(xrealone_tap_probe PRIVATE
+    vrealone_audio_input
+    xreal_one_driver
+  )
+  target_compile_options(xrealone_tap_probe PRIVATE
+    -Wall -Wextra -Wpedantic -Werror
+  )
 endif()
 
 if(VREALONE_BUILD_DRIVER)
@@ -68,7 +92,10 @@ if(VREALONE_BUILD_DRIVER)
     src/driver_factory.cpp
     src/hmd_device.cpp
   )
-  target_link_libraries(driver_xrealone PRIVATE vrealone_core)
+  target_link_libraries(driver_xrealone PRIVATE
+    vrealone_core
+    vrealone_audio_input
+  )
   if(VREALONE_ENABLE_SENSOR)
     target_link_libraries(driver_xrealone PRIVATE
       vrealone_fusion_tracker
@@ -88,6 +115,7 @@ if(VREALONE_BUILD_DRIVER)
 
   file(MAKE_DIRECTORY
     "${CMAKE_BINARY_DIR}/xrealone/resources/settings"
+    "${CMAKE_BINARY_DIR}/xrealone/resources/input"
     "${CMAKE_BINARY_DIR}/xrealone/examples"
   )
   configure_file(
@@ -98,6 +126,16 @@ if(VREALONE_BUILD_DRIVER)
   configure_file(
     resources/xrealone/resources/settings/default.vrsettings
     "${CMAKE_BINARY_DIR}/xrealone/resources/settings/default.vrsettings"
+    COPYONLY
+  )
+  configure_file(
+    resources/xrealone/resources/input/xrealone_hmd_profile.json
+    "${CMAKE_BINARY_DIR}/xrealone/resources/input/xrealone_hmd_profile.json"
+    COPYONLY
+  )
+  configure_file(
+    resources/xrealone/resources/input/xrealone_dashboard_binding.json
+    "${CMAKE_BINARY_DIR}/xrealone/resources/input/xrealone_dashboard_binding.json"
     COPYONLY
   )
   configure_file(
@@ -113,9 +151,11 @@ if(BUILD_TESTING)
     tests/edid_tests.cpp
     tests/main.cpp
     tests/coordinate_transform_tests.cpp
+    tests/control_server_tests.cpp
     tests/pose_snapshot_tests.cpp
     tests/quaternion_tests.cpp
     tests/recenter_tests.cpp
+    tests/tap_detector_tests.cpp
   )
   target_link_libraries(vrealone_tests PRIVATE vrealone_core)
   target_include_directories(vrealone_tests PRIVATE tests)

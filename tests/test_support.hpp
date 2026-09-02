@@ -25,7 +25,6 @@ void RunQuaternionTests();
 void RunPoseSnapshotTests();
 void RunRecenterTests();
 void RunGazeDwellDetectorTests();
-void RunTapDetectorTests();
-#if VREALONE_HAS_FUSION
+#if defined(VREALONE_HAS_FUSION)
 void RunFusionTrackerTests();
 #endif

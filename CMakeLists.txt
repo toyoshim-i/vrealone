@@ -5,7 +5,6 @@ cmake_minimum_required(VERSION 3.24)
 project(vrealone VERSION 0.1.0 LANGUAGES C CXX)
 
 include(CTest)
-find_package(ALSA REQUIRED)
 
 option(VREALONE_BUILD_DRIVER "Build the SteamVR driver" ON)
 option(VREALONE_ENABLE_SENSOR "Build XREAL One sensor support" ON)
@@ -22,7 +21,6 @@ add_library(vrealone_core STATIC
   src/display_config.cpp
   src/control/control_server.cpp
   src/input/gaze_dwell_detector.cpp
-  src/input/tap_detector.cpp
   src/platform/edid.cpp
   src/tracking/coordinate_transform.cpp
   src/tracking/pose_snapshot.cpp
@@ -30,7 +28,11 @@ add_library(vrealone_core STATIC
   src/tracking/recenter.cpp
 )
 target_include_directories(vrealone_core PUBLIC src)
-target_compile_options(vrealone_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
+if(MSVC)
+  target_compile_options(vrealone_core PRIVATE /W4 /WX)
+else()
+  target_compile_options(vrealone_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
 set_target_properties(vrealone_core PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   CXX_VISIBILITY_PRESET hidden
@@ -39,19 +41,19 @@ set_target_properties(vrealone_core PROPERTIES
 
 add_executable(xrealone_probe tools/xrealone_probe.cpp)
 target_link_libraries(xrealone_probe PRIVATE vrealone_core)
-target_compile_options(xrealone_probe PRIVATE -Wall -Wextra -Wpedantic -Werror)
+if(MSVC)
+  target_compile_options(xrealone_probe PRIVATE /W4 /WX)
+else()
+  target_compile_options(xrealone_probe PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
 
 add_executable(xrealone_ctl tools/xrealone_ctl.cpp)
 target_link_libraries(xrealone_ctl PRIVATE vrealone_core)
-target_compile_options(xrealone_ctl PRIVATE -Wall -Wextra -Wpedantic -Werror)
-
-add_library(vrealone_audio_input STATIC src/input/audio_tap_input.cpp)
-target_link_libraries(vrealone_audio_input PUBLIC vrealone_core ALSA::ALSA)
-target_include_directories(vrealone_audio_input PUBLIC src)
-target_compile_options(vrealone_audio_input PRIVATE
-  -Wall -Wextra -Wpedantic -Werror
-)
-set_target_properties(vrealone_audio_input PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+  target_compile_options(xrealone_ctl PRIVATE /W4 /WX)
+else()
+  target_compile_options(xrealone_ctl PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
 
 if(VREALONE_ENABLE_SENSOR)
   include(cmake/SensorDependency.cmake)
@@ -62,9 +64,13 @@ if(VREALONE_ENABLE_SENSOR)
     PUBLIC vrealone_fusion_upstream
   )
   target_include_directories(vrealone_fusion_tracker PUBLIC src)
-  target_compile_options(vrealone_fusion_tracker PRIVATE
-    -Wall -Wextra -Wpedantic -Werror
-  )
+  if(MSVC)
+    target_compile_options(vrealone_fusion_tracker PRIVATE /W4 /WX)
+  else()
+    target_compile_options(vrealone_fusion_tracker PRIVATE
+      -Wall -Wextra -Wpedantic -Werror
+    )
+  endif()
   set_target_properties(vrealone_fusion_tracker PROPERTIES
     POSITION_INDEPENDENT_CODE ON
   )
@@ -73,19 +79,18 @@ if(VREALONE_ENABLE_SENSOR)
     xreal_one_driver
   )
   target_compile_definitions(xrealone_probe PRIVATE VREALONE_HAS_SENSOR=1)
-
-  add_executable(xrealone_tap_probe tools/xrealone_tap_probe.cpp)
-  target_link_libraries(xrealone_tap_probe PRIVATE
-    vrealone_audio_input
-    xreal_one_driver
-  )
-  target_compile_options(xrealone_tap_probe PRIVATE
-    -Wall -Wextra -Wpedantic -Werror
-  )
 endif()
 
 if(VREALONE_BUILD_DRIVER)
   include(cmake/Dependencies.cmake)
+
+  if(WIN32)
+    set(VREALONE_DEFAULT_SETTINGS
+        resources/xrealone/resources/settings/default.windows.vrsettings)
+  else()
+    set(VREALONE_DEFAULT_SETTINGS
+        resources/xrealone/resources/settings/default.vrsettings)
+  endif()
 
   add_library(driver_xrealone SHARED
     src/device_provider.cpp
@@ -95,7 +100,6 @@ if(VREALONE_BUILD_DRIVER)
   )
   target_link_libraries(driver_xrealone PRIVATE
     vrealone_core
-    vrealone_audio_input
   )
   if(VREALONE_ENABLE_SENSOR)
     target_link_libraries(driver_xrealone PRIVATE
@@ -105,13 +109,20 @@ if(VREALONE_BUILD_DRIVER)
     target_compile_definitions(driver_xrealone PRIVATE VREALONE_HAS_SENSOR=1)
   endif()
   target_include_directories(driver_xrealone SYSTEM PRIVATE "${OPENVR_INCLUDE_DIR}")
-  target_compile_definitions(driver_xrealone PRIVATE LINUX POSIX)
-  target_compile_options(driver_xrealone PRIVATE
-    -Wall -Wextra -Wpedantic -Werror -fvisibility=hidden
-  )
+  if(WIN32)
+    set(VREALONE_DRIVER_PLATFORM "win64")
+    target_compile_options(driver_xrealone PRIVATE /W4 /WX)
+  else()
+    set(VREALONE_DRIVER_PLATFORM "linux64")
+    target_compile_definitions(driver_xrealone PRIVATE LINUX POSIX)
+    target_compile_options(driver_xrealone PRIVATE
+      -Wall -Wextra -Wpedantic -Werror -fvisibility=hidden
+    )
+  endif()
+  set_target_properties(driver_xrealone PROPERTIES PREFIX "")
   set_target_properties(driver_xrealone PROPERTIES
-    PREFIX ""
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/xrealone/bin/linux64"
+    LIBRARY_OUTPUT_DIRECTORY "$<1:${CMAKE_BINARY_DIR}/xrealone/bin/${VREALONE_DRIVER_PLATFORM}>"
+    RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_BINARY_DIR}/xrealone/bin/${VREALONE_DRIVER_PLATFORM}>"
   )
 
   file(MAKE_DIRECTORY
@@ -125,7 +136,7 @@ if(VREALONE_BUILD_DRIVER)
     COPYONLY
   )
   configure_file(
-    resources/xrealone/resources/settings/default.vrsettings
+    "${VREALONE_DEFAULT_SETTINGS}"
     "${CMAKE_BINARY_DIR}/xrealone/resources/settings/default.vrsettings"
     COPYONLY
   )
@@ -157,11 +168,14 @@ if(BUILD_TESTING)
     tests/quaternion_tests.cpp
     tests/recenter_tests.cpp
     tests/gaze_dwell_detector_tests.cpp
-    tests/tap_detector_tests.cpp
   )
   target_link_libraries(vrealone_tests PRIVATE vrealone_core)
   target_include_directories(vrealone_tests PRIVATE tests)
-  target_compile_options(vrealone_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  if(MSVC)
+    target_compile_options(vrealone_tests PRIVATE /W4 /WX)
+  else()
+    target_compile_options(vrealone_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  endif()
   add_test(NAME vrealone_tests COMMAND vrealone_tests)
   if(VREALONE_ENABLE_SENSOR)
     target_sources(vrealone_tests PRIVATE tests/fusion_tracker_tests.cpp)

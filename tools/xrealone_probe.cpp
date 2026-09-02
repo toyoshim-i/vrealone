@@ -14,7 +14,7 @@
 #include "tracking/coordinate_transform.hpp"
 #include "tracking/recenter.hpp"
 
-#if VREALONE_HAS_SENSOR
+#if defined(VREALONE_HAS_SENSOR)
 #include <xreal_one_driver.h>
 
 #include "tracking/fusion_tracker.hpp"
@@ -95,7 +95,7 @@ int CheckDirectDisplay() {
   return 1;
 }
 
-#if VREALONE_HAS_SENSOR
+#if defined(VREALONE_HAS_SENSOR)
 int ProbeSensor(const char* address, const long sample_count) {
   auto* handle = xo_new_with_addr(address);
   if (handle == nullptr) {
@@ -252,7 +252,7 @@ int main(const int argc, char** argv) {
   if (std::string(argv[1]) == "--check-direct-display") {
     return CheckDirectDisplay();
   }
-#if VREALONE_HAS_SENSOR
+#if defined(VREALONE_HAS_SENSOR)
   if (std::string(argv[1]) == "--sensor") {
     const char* address = argc >= 3 ? argv[2] : "169.254.2.1:52998";
     const long sample_count = argc >= 4 ? std::strtol(argv[3], nullptr, 10) : 500;

@@ -14,8 +14,7 @@ int main() {
     RunPoseSnapshotTests();
     RunRecenterTests();
     RunGazeDwellDetectorTests();
-    RunTapDetectorTests();
-#if VREALONE_HAS_FUSION
+#if defined(VREALONE_HAS_FUSION)
     RunFusionTrackerTests();
 #endif
   } catch (const std::exception& error) {

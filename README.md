@@ -1,7 +1,8 @@
 # vrealone
 
-`vrealone` is an Apache-2.0-licensed, native Linux SteamVR driver under
-development for XREAL One glasses. The current milestone provides:
+`vrealone` is an Apache-2.0-licensed SteamVR driver under development for
+XREAL One glasses. Linux and Windows x64 builds are supported. The current
+milestone provides:
 
 - a buildable OpenVR HMD driver with a direct-display component;
 - measured XREAL One USB and EDID identification;
@@ -10,9 +11,8 @@ development for XREAL One glasses. The current milestone provides:
 - a DRM/EDID and IMU diagnostic probe;
 - a bounded, reconnecting IMU worker feeding Fusion AHRS pose snapshots;
 - quaternion recentering and stale-pose invalidation;
-- opt-in microphone-plus-IMU temple-tap controls for gaze selection and
-  recentering;
-- a user-only local control socket for click, recenter, and status requests;
+- head-gaze dwell selection;
+- a local control endpoint for click, recenter, and status requests;
 - deterministic tests that do not require SteamVR or connected hardware.
 
 Sensor-enabled builds now feed live IMU orientation and angular velocity into
@@ -52,13 +52,25 @@ eye at 1920x1080 before output scaling. A full-SBS override is provided at
 `resources/xrealone/examples/full-sbs.vrsettings`, but remains unvalidated on
 the initial host.
 
+On Windows, build an x64 DLL even when the host is Windows 11 on Arm because
+the current SteamVR server process is x64:
+
+```powershell
+cmake -S . -B build-win64 -G "Visual Studio 17 2022" -A x64
+cmake --build build-win64 --config Release
+ctest --test-dir build-win64 -C Release --output-on-failure
+```
+
+The Windows package uses `bin/win64/driver_xrealone.dll`. Its default settings
+use extended-desktop mode so it can also be tested with a virtual display.
+
 ## Install and register with SteamVR
 
 The following package names apply to Ubuntu 24.04. SteamVR must already be
 installed for the current user:
 
 ```sh
-sudo apt install build-essential cmake ninja-build libasound2-dev
+sudo apt install build-essential cmake ninja-build
 cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release
 ctest --test-dir build-release --output-on-failure
@@ -66,8 +78,7 @@ ctest --test-dir build-release --output-on-failure
 
 The default build downloads reviewed dependency revisions recorded in
 `THIRD_PARTY.yml`. Use the offline build options above when network access is
-not appropriate. ALSA is dynamically linked for microphone capture; no ALSA
-source is copied into this Apache-2.0 project.
+not appropriate.
 
 Close SteamVR, then register the build directory as an external driver:
 
@@ -87,6 +98,52 @@ steamvr_root="$HOME/.local/share/Steam/steamapps/common/SteamVR"
 
 Do not copy files into SteamVR's installation directory. Registration through
 `vrpathreg` keeps project files separate from Steam-managed files.
+
+On Windows, register the x64 build with SteamVR's `vrpathreg.exe`:
+
+```powershell
+$steamVr = "${env:ProgramFiles(x86)}\Steam\steamapps\common\SteamVR"
+& "$steamVr\bin\win64\vrpathreg.exe" adddriver `
+  "$PWD\build-win64\xrealone"
+```
+
+Windows includes current DirectX, but it does not necessarily include the
+legacy side-by-side D3DX libraries used by some SteamVR components. If startup
+reports a missing `d3dx10_43.dll`, run Microsoft's DirectX June 2010 setup
+already cached by Steam. Steam normally installs common redistributables when
+SteamVR is launched from the Steam client; launching `vrstartup.exe` directly
+during driver development can bypass that first-run step:
+
+```powershell
+$redist = "${env:ProgramFiles(x86)}\Steam\steamapps\common\Steamworks Shared\_CommonRedist"
+& "$redist\DirectX\Jun2010\DXSETUP.exe" /silent
+```
+
+Do not download individual DLL files from third-party DLL sites. The Microsoft
+installer adds both x64 and x86 side-by-side components without replacing the
+DirectX version built into Windows.
+
+If SteamVR logs driver load error 126 and `CONCRT140.dll` is absent, install
+Steam's cached Microsoft Visual C++ 2022 redistributables as well:
+
+```powershell
+& "$redist\vcredist\2022\VC_redist.x64.exe" /install /quiet /norestart
+& "$redist\vcredist\2022\VC_redist.x86.exe" /install /quiet /norestart
+```
+
+SteamVR should also be selected as the active OpenXR runtime from SteamVR's
+OpenXR settings. Verify the 64-bit Windows registration with:
+
+```powershell
+reg query "HKLM\SOFTWARE\Khronos\OpenXR\1" /v ActiveRuntime
+```
+
+The value should point to SteamVR's `steamxr_win64.json`.
+
+Windows on Arm uses the same x64 package while SteamVR's `vrserver.exe` is
+x64. A Parallels VM can pass the XREAL USB NCM interface through for IMU
+tracking, but its virtual display adapter is a separate compositor dependency;
+see `docs/windows-on-arm.md`.
 
 ## Hardware probes
 
@@ -159,60 +216,13 @@ movements. `pitch_x` should increase when looking up, `yaw_y` should increase
 when turning left, and `roll_z` should decrease when lowering the right ear.
 The command runs for approximately ten seconds with the default sample count.
 
-## Temple-tap controls
+## Head-gaze controls
 
-XREAL One advertises a two-channel USB microphone, but both captured channels
-are identical on the tested hardware. Left- and right-temple taps therefore
-cannot be distinguished. The driver instead accepts a tap only when a loud
-microphone peak and an IMU acceleration impulse occur together. It processes
-20 ms peak windows and does not record or write audio samples.
-
-Tap input is opt-in. Merge these values into the `driver_xrealone` object in
-`~/.local/share/Steam/config/steamvr.vrsettings` while SteamVR is stopped:
-
-```json
-{
-  "driver_xrealone": {
-    "tap_input_enabled": true,
-    "tap_audio_device": "pulse",
-    "tap_audio_peak_threshold": 80000000,
-    "tap_imu_deviation_m_s2": 3.0
-  }
-}
-```
-
-`pulse` uses PipeWire's PulseAudio-compatible shared capture path and works
-inside the tested Steam Runtime, where the native ALSA `pipewire` PCM name is
-not available to `vrserver`. Select **XREAL One Analog Stereo** as the default
-input source and confirm it with `wpctl status` before starting SteamVR.
-
-The initial gesture mapping is:
-
-- one temple tap: gaze select after the double-tap decision window;
-- two distinct taps roughly 200--650 ms apart: recenter after the glasses
-  settle.
-
-If a light tap is ignored, tap slightly more firmly instead of immediately
-lowering the thresholds. A loud sound without an IMU impulse, or an IMU impulse
-without a loud microphone peak, is rejected.
-
-Test detection without starting SteamVR:
-
-```sh
-./build-release/xrealone_tap_probe 15
-```
-
-After the ready message, wait one second, tap once, wait one second, then tap
-twice about 300 ms apart. The expected summary is exactly
-`clicks=1 recenters=1`. Optional arguments select the duration, IMU address,
-and ALSA capture device:
-
-```sh
-./build-release/xrealone_tap_probe 15 169.254.2.1:52998 pulse
-```
-
-While the driver is running, the local user-only control socket also supports
-explicit diagnostics and fallback actions:
+Holding the head orientation within the configured angular threshold triggers
+`/input/select/click`. The dwell duration, angular threshold, and cooldown are
+configured with `gaze_dwell_time_ms`, `gaze_dwell_max_angle_deg`, and
+`gaze_dwell_cooldown_ms`. The local control endpoint also supports explicit
+diagnostics and fallback actions:
 
 ```sh
 ./build-release/xrealone_ctl status
@@ -252,22 +262,7 @@ The repository contains no source copied from the GPL reference-only projects.
 
 ## TODO
 
-- Expose every tap-classification timing value through `driver_xrealone`
-  settings: microphone/IMU correlation window, double-tap window, tap
-  refractory period, post-double-tap settling delay, IMU quiet/rearm period,
-  microphone startup suppression, and OpenVR click-pulse duration.
 - Validate settings at load time, log the effective values, and retain safe
   bounds so malformed configuration cannot create an input loop.
-- Add a guided calibration tool that measures microphone background and impact
-  peaks, IMU background and impact deviation, audio-server latency, and the
-  user's deliberate double-tap cadence. It should recommend a complete settings
-  block, report confidence and false-positive margin, and update
-  `steamvr.vrsettings` only after making a backup and receiving explicit
-  approval.
-- Extend `xrealone_tap_probe` with a passive false-positive test and
-  machine-readable output so calibration results can be compared across
-  firmware versions and hosts.
-- Select the XREAL microphone by stable PipeWire/udev identity instead of
-  relying on the current default capture source.
 - Add idempotent install and uninstall scripts that locate SteamVR and invoke
   `vrpathreg` without modifying Steam-managed directories.

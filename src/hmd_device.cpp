@@ -8,7 +8,7 @@
 #include <memory>
 #include <string>
 
-#if VREALONE_HAS_SENSOR
+#if defined(VREALONE_HAS_SENSOR)
 #include <xreal_one_driver.h>
 #endif
 
@@ -20,7 +20,6 @@ HmdDevice::HmdDevice(DisplayConfig display_config, std::string imu_address,
                      const std::chrono::milliseconds stale_pose_timeout,
                      const std::chrono::milliseconds reconnect_initial,
                      const std::chrono::milliseconds reconnect_max,
-                     input::TapControlConfig tap_control_config,
                      input::GazeDwellConfig gaze_dwell_config,
                      const double standing_height_meters)
     : display_config_(display_config),
@@ -29,15 +28,12 @@ HmdDevice::HmdDevice(DisplayConfig display_config, std::string imu_address,
       stale_pose_timeout_(stale_pose_timeout),
       reconnect_initial_(reconnect_initial),
       reconnect_max_(reconnect_max),
-      tap_control_config_(std::move(tap_control_config)),
       gaze_dwell_config_(gaze_dwell_config),
       standing_height_meters_(standing_height_meters),
-      audio_tap_input_(tap_control_config_.audio),
       gaze_dwell_detector_(gaze_dwell_config_) {}
 
 HmdDevice::~HmdDevice() {
   control_server_.Stop();
-  StopTapInput();
   StopSensor();
 }
 
@@ -87,18 +83,16 @@ vr::EVRInitError HmdDevice::Activate(const std::uint32_t object_id) {
           [this](const control::Command command) {
             return HandleControlCommand(command);
           })) {
-    vr::VRDriverLog()->Log("xrealone: failed to start control socket");
+    vr::VRDriverLog()->Log("xrealone: failed to start control endpoint");
   } else {
-    vr::VRDriverLog()->Log("xrealone: control socket ready");
+    vr::VRDriverLog()->Log("xrealone: control endpoint ready");
   }
   StartSensor();
-  StartTapInput();
   return vr::VRInitError_None;
 }
 
 void HmdDevice::Deactivate() {
   control_server_.Stop();
-  StopTapInput();
   StopSensor();
   select_click_handle_ = vr::k_ulInvalidInputComponentHandle;
   device_index_.store(vr::k_unTrackedDeviceIndexInvalid);
@@ -155,7 +149,7 @@ vr::DriverPose_t HmdDevice::GetPose() {
   pose.vecAngularVelocity[1] = world_angular_velocity[1];
   pose.vecAngularVelocity[2] = world_angular_velocity[2];
 
-#if VREALONE_HAS_SENSOR
+#if defined(VREALONE_HAS_SENSOR)
   const bool fresh = tracking::IsPoseFresh(
       snapshot, std::chrono::steady_clock::now(), stale_pose_timeout_);
   pose.deviceIsConnected = snapshot.state != tracking::TrackingState::disconnected;
@@ -240,28 +234,6 @@ std::string HmdDevice::HandleControlCommand(const control::Command command) {
   return "unknown command";
 }
 
-void HmdDevice::StartTapInput() {
-  if (!tap_control_config_.enabled) {
-    return;
-  }
-  const bool started = audio_tap_input_.Start(
-      [this](const input::TapAction action) {
-        if (action == input::TapAction::click) {
-          QueueSelectClick();
-        } else if (action == input::TapAction::recenter) {
-          recenter_requested_.store(true);
-        }
-      },
-      [this] {
-        return std::chrono::steady_clock::time_point(
-            std::chrono::nanoseconds(last_imu_impact_ns_.load()));
-      });
-  vr::VRDriverLog()->Log(started ? "xrealone: tap input ready"
-                                 : "xrealone: tap input unavailable");
-}
-
-void HmdDevice::StopTapInput() { audio_tap_input_.Stop(); }
-
 void HmdDevice::QueueSelectClick() {
   constexpr auto kClickDuration = std::chrono::milliseconds(150);
   const auto until = std::chrono::steady_clock::now() + kClickDuration;
@@ -271,7 +243,7 @@ void HmdDevice::QueueSelectClick() {
           .count());
 }
 
-#if VREALONE_HAS_SENSOR
+#if defined(VREALONE_HAS_SENSOR)
 void HmdDevice::StartSensor() {
   StopSensor();
   pose_store_.Publish({.state = tracking::TrackingState::disconnected});
@@ -291,8 +263,6 @@ void HmdDevice::StopSensor() {
 
 void HmdDevice::SensorLoop(const std::stop_token stop_token) {
   auto reconnect_delay = reconnect_initial_;
-  input::ImuImpactDetector impact_detector(
-      tap_control_config_.imu_acceleration_deviation_m_s2);
   while (!stop_token.stop_requested()) {
     using Handle = std::unique_ptr<XrealOneHandle, decltype(&xo_free)>;
     Handle handle(xo_new_with_addr(imu_address_.c_str()), &xo_free);
@@ -307,7 +277,6 @@ void HmdDevice::SensorLoop(const std::stop_token stop_token) {
     }
 
     fusion_tracker_.Reset();
-    impact_detector.Reset();
     pose_store_.Publish({.received_at = std::chrono::steady_clock::now(),
                          .state = tracking::TrackingState::calibrating});
     vr::VRDriverLog()->Log("xrealone: IMU connected; calibrating");
@@ -323,19 +292,6 @@ void HmdDevice::SensorLoop(const std::stop_token stop_token) {
           std::isfinite(sample.accel[1]) && std::isfinite(sample.accel[2]);
       if (!finite) {
         continue;
-      }
-      const auto acceleration_magnitude = std::sqrt(
-          sample.accel[0] * sample.accel[0] +
-          sample.accel[1] * sample.accel[1] +
-          sample.accel[2] * sample.accel[2]);
-      constexpr float kStandardGravity = 9.80665F;
-      if (impact_detector.Observe(
-              std::chrono::steady_clock::now(),
-              std::abs(acceleration_magnitude - kStandardGravity))) {
-        last_imu_impact_ns_.store(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch())
-                .count());
       }
       reconnect_delay = reconnect_initial_;
       auto snapshot =

@@ -104,38 +104,6 @@ SensorConfig LoadSensorConfig() {
   return config;
 }
 
-input::TapControlConfig LoadTapControlConfig() {
-  input::TapControlConfig config;
-  vr::EVRSettingsError error = vr::VRSettingsError_None;
-  config.enabled =
-      vr::VRSettings()->GetBool(kSettingsSection, "tap_input_enabled", &error);
-  if (error != vr::VRSettingsError_None) {
-    config.enabled = false;
-    error = vr::VRSettingsError_None;
-  }
-  std::array<char, 256> device{};
-  vr::VRSettings()->GetString(kSettingsSection, "tap_audio_device",
-                              device.data(),
-                              static_cast<std::uint32_t>(device.size()),
-                              &error);
-  if (error == vr::VRSettingsError_None && device[0] != '\0') {
-    config.audio.device = device.data();
-  }
-  error = vr::VRSettingsError_None;
-  const auto audio_threshold = vr::VRSettings()->GetInt32(
-      kSettingsSection, "tap_audio_peak_threshold", &error);
-  if (error == vr::VRSettingsError_None && audio_threshold > 0) {
-    config.audio.detector.audio_peak_threshold = audio_threshold;
-  }
-  error = vr::VRSettingsError_None;
-  const auto imu_threshold = vr::VRSettings()->GetFloat(
-      kSettingsSection, "tap_imu_deviation_m_s2", &error);
-  if (error == vr::VRSettingsError_None && imu_threshold > 0.0F) {
-    config.imu_acceleration_deviation_m_s2 = imu_threshold;
-  }
-  return config;
-}
-
 input::GazeDwellConfig LoadGazeDwellConfig() {
   input::GazeDwellConfig config;
   vr::EVRSettingsError error = vr::VRSettingsError_None;
@@ -197,6 +165,7 @@ vr::EVRInitError DeviceProvider::Init(vr::IVRDriverContext* driver_context) {
         "xrealone: direct mode enabled without measured EDID identifiers");
   }
   if (config.direct_mode) {
+#if !defined(_WIN32)
     const auto assessment = platform::AssessDirectDisplay(
         platform::ProbeDrmDisplays(),
         static_cast<std::uint16_t>(config.edid_vendor_id),
@@ -220,15 +189,15 @@ vr::EVRInitError DeviceProvider::Init(vr::IVRDriverContext* driver_context) {
       }
       return vr::VRInitError_Driver_Failed;
     }
+#endif
   }
 
   const auto sensor = LoadSensorConfig();
-  const auto tap_control = LoadTapControlConfig();
   const auto gaze_dwell = LoadGazeDwellConfig();
   const auto standing_height = LoadStandingHeight();
   hmd_ = std::make_unique<HmdDevice>(
       config, sensor.address, sensor.stale_pose_timeout,
-      sensor.reconnect_initial, sensor.reconnect_max, tap_control, gaze_dwell,
+      sensor.reconnect_initial, sensor.reconnect_max, gaze_dwell,
       standing_height);
   if (!vr::VRServerDriverHost()->TrackedDeviceAdded(
           hmd_->SerialNumber().c_str(), vr::TrackedDeviceClass_HMD, hmd_.get())) {

@@ -30,7 +30,9 @@ add_library(vrealone_fusion_upstream STATIC
 target_include_directories(vrealone_fusion_upstream SYSTEM
   PUBLIC "${fusion_SOURCE_DIR}/Fusion"
 )
-target_link_libraries(vrealone_fusion_upstream PUBLIC m)
+if(NOT MSVC)
+  target_link_libraries(vrealone_fusion_upstream PUBLIC m)
+endif()
 set_target_properties(vrealone_fusion_upstream PROPERTIES
   POSITION_INDEPENDENT_CODE ON
 )

@@ -15,12 +15,11 @@
 
 #include "control/control_server.hpp"
 #include "display_component.hpp"
-#include "input/audio_tap_input.hpp"
 #include "input/gaze_dwell_detector.hpp"
 #include "tracking/pose_snapshot.hpp"
 #include "tracking/recenter.hpp"
 
-#if VREALONE_HAS_SENSOR
+#if defined(VREALONE_HAS_SENSOR)
 #include "tracking/fusion_tracker.hpp"
 #endif
 
@@ -32,7 +31,6 @@ class HmdDevice final : public vr::ITrackedDeviceServerDriver {
             std::chrono::milliseconds stale_pose_timeout,
             std::chrono::milliseconds reconnect_initial,
             std::chrono::milliseconds reconnect_max,
-            input::TapControlConfig tap_control_config,
             input::GazeDwellConfig gaze_dwell_config = {},
             double standing_height_meters = 1.5);
   ~HmdDevice();
@@ -53,11 +51,9 @@ class HmdDevice final : public vr::ITrackedDeviceServerDriver {
                      const char* text) const;
   void StartSensor();
   void StopSensor();
-  void StartTapInput();
-  void StopTapInput();
   void QueueSelectClick();
   [[nodiscard]] std::string HandleControlCommand(control::Command command);
-#if VREALONE_HAS_SENSOR
+#if defined(VREALONE_HAS_SENSOR)
   void SensorLoop(std::stop_token stop_token);
   bool WaitForReconnect(std::stop_token stop_token,
                         std::chrono::milliseconds duration);
@@ -71,7 +67,6 @@ class HmdDevice final : public vr::ITrackedDeviceServerDriver {
   std::chrono::milliseconds stale_pose_timeout_;
   std::chrono::milliseconds reconnect_initial_;
   std::chrono::milliseconds reconnect_max_;
-  input::TapControlConfig tap_control_config_;
   input::GazeDwellConfig gaze_dwell_config_;
   double standing_height_meters_ = 1.5;
   std::string serial_number_ = "XREALONE-UNPROBED";
@@ -79,12 +74,10 @@ class HmdDevice final : public vr::ITrackedDeviceServerDriver {
   control::ControlServer control_server_;
   std::atomic<bool> recenter_requested_{false};
   std::atomic<std::int64_t> select_click_until_ns_{0};
-  std::atomic<std::int64_t> last_imu_impact_ns_{0};
   vr::VRInputComponentHandle_t select_click_handle_ =
       vr::k_ulInvalidInputComponentHandle;
-  input::AudioTapInput audio_tap_input_;
   input::GazeDwellDetector gaze_dwell_detector_;
-#if VREALONE_HAS_SENSOR
+#if defined(VREALONE_HAS_SENSOR)
   tracking::FusionTracker fusion_tracker_;
   std::jthread sensor_thread_;
   std::mutex reconnect_mutex_;

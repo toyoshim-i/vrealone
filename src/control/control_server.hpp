@@ -30,7 +30,11 @@ class ControlServer {
 
   std::string path_;
   Handler handler_;
+#if defined(_WIN32)
+  void* pipe_ = nullptr;
+#else
   int listen_socket_ = -1;
+#endif
   std::jthread thread_;
 };
 

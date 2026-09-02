@@ -66,7 +66,6 @@ settings_backup=$(mktemp)
 cp "$settings_path" "$settings_backup"
 temporary_settings=$(mktemp)
 jq '.driver_xrealone.enable = true |
-    .driver_xrealone.tap_input_enabled = true |
     .steamvr.directDisplay = true |
     .steamvr.preferredRefreshRate = 60' \
   "$settings_path" > "$temporary_settings"

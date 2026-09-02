@@ -22,14 +22,23 @@ endif()
 
 find_program(CARGO_EXECUTABLE cargo REQUIRED)
 set(XREAL_CARGO_TARGET_DIR "${CMAKE_BINARY_DIR}/cargo")
-set(XREAL_STATIC_LIBRARY
-    "${XREAL_CARGO_TARGET_DIR}/release/libxreal_one_driver.a")
+if(WIN32)
+  set(XREAL_RUST_TARGET "x86_64-pc-windows-msvc")
+  set(XREAL_STATIC_LIBRARY
+      "${XREAL_CARGO_TARGET_DIR}/${XREAL_RUST_TARGET}/release/xreal_one_driver.lib")
+  set(XREAL_CARGO_TARGET_ARGS --target "${XREAL_RUST_TARGET}")
+else()
+  set(XREAL_STATIC_LIBRARY
+      "${XREAL_CARGO_TARGET_DIR}/release/libxreal_one_driver.a")
+  set(XREAL_CARGO_TARGET_ARGS)
+endif()
 
 add_custom_command(
   OUTPUT "${XREAL_STATIC_LIBRARY}"
   COMMAND "${CMAKE_COMMAND}" -E env
           "CARGO_TARGET_DIR=${XREAL_CARGO_TARGET_DIR}"
           "${CARGO_EXECUTABLE}" build --locked --release
+          ${XREAL_CARGO_TARGET_ARGS}
           --manifest-path "${xreal_driver_SOURCE_DIR}/Cargo.toml"
   DEPENDS
     "${xreal_driver_SOURCE_DIR}/Cargo.toml"
@@ -45,3 +54,12 @@ set_target_properties(xreal_one_driver PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "${xreal_driver_SOURCE_DIR}/include"
 )
 add_dependencies(xreal_one_driver xreal_one_driver_build)
+if(WIN32)
+  target_link_libraries(xreal_one_driver INTERFACE
+    ws2_32
+    ntdll
+    userenv
+    bcrypt
+    advapi32
+  )
+endif()

@@ -13,6 +13,7 @@ int main() {
     RunQuaternionTests();
     RunPoseSnapshotTests();
     RunRecenterTests();
+    RunGazeDwellDetectorTests();
     RunTapDetectorTests();
 #if VREALONE_HAS_FUSION
     RunFusionTrackerTests();

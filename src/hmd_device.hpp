@@ -5,6 +5,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -15,6 +16,7 @@
 #include "control/control_server.hpp"
 #include "display_component.hpp"
 #include "input/audio_tap_input.hpp"
+#include "input/gaze_dwell_detector.hpp"
 #include "tracking/pose_snapshot.hpp"
 #include "tracking/recenter.hpp"
 
@@ -30,7 +32,9 @@ class HmdDevice final : public vr::ITrackedDeviceServerDriver {
             std::chrono::milliseconds stale_pose_timeout,
             std::chrono::milliseconds reconnect_initial,
             std::chrono::milliseconds reconnect_max,
-            input::TapControlConfig tap_control_config);
+            input::TapControlConfig tap_control_config,
+            input::GazeDwellConfig gaze_dwell_config = {},
+            double standing_height_meters = 1.5);
   ~HmdDevice();
 
   vr::EVRInitError Activate(std::uint32_t object_id) override;
@@ -68,6 +72,8 @@ class HmdDevice final : public vr::ITrackedDeviceServerDriver {
   std::chrono::milliseconds reconnect_initial_;
   std::chrono::milliseconds reconnect_max_;
   input::TapControlConfig tap_control_config_;
+  input::GazeDwellConfig gaze_dwell_config_;
+  double standing_height_meters_ = 1.5;
   std::string serial_number_ = "XREALONE-UNPROBED";
   std::atomic<std::uint32_t> device_index_{vr::k_unTrackedDeviceIndexInvalid};
   control::ControlServer control_server_;
@@ -77,6 +83,7 @@ class HmdDevice final : public vr::ITrackedDeviceServerDriver {
   vr::VRInputComponentHandle_t select_click_handle_ =
       vr::k_ulInvalidInputComponentHandle;
   input::AudioTapInput audio_tap_input_;
+  input::GazeDwellDetector gaze_dwell_detector_;
 #if VREALONE_HAS_SENSOR
   tracking::FusionTracker fusion_tracker_;
   std::jthread sensor_thread_;

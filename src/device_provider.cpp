@@ -136,6 +136,45 @@ input::TapControlConfig LoadTapControlConfig() {
   return config;
 }
 
+input::GazeDwellConfig LoadGazeDwellConfig() {
+  input::GazeDwellConfig config;
+  vr::EVRSettingsError error = vr::VRSettingsError_None;
+  config.enabled =
+      vr::VRSettings()->GetBool(kSettingsSection, "gaze_dwell_enabled", &error);
+  if (error != vr::VRSettingsError_None) {
+    config.enabled = true;
+    error = vr::VRSettingsError_None;
+  }
+  const auto dwell_time_ms = vr::VRSettings()->GetInt32(
+      kSettingsSection, "gaze_dwell_time_ms", &error);
+  if (error == vr::VRSettingsError_None && dwell_time_ms > 0) {
+    config.dwell_time = std::chrono::milliseconds(dwell_time_ms);
+  }
+  error = vr::VRSettingsError_None;
+  const auto angle_deg = vr::VRSettings()->GetFloat(
+      kSettingsSection, "gaze_dwell_max_angle_deg", &error);
+  if (error == vr::VRSettingsError_None && angle_deg > 0.0F) {
+    config.max_angle_deviation_deg = angle_deg;
+  }
+  error = vr::VRSettingsError_None;
+  const auto cooldown_ms = vr::VRSettings()->GetInt32(
+      kSettingsSection, "gaze_dwell_cooldown_ms", &error);
+  if (error == vr::VRSettingsError_None && cooldown_ms > 0) {
+    config.cooldown_time = std::chrono::milliseconds(cooldown_ms);
+  }
+  return config;
+}
+
+double LoadStandingHeight() {
+  vr::EVRSettingsError error = vr::VRSettingsError_None;
+  const auto height = vr::VRSettings()->GetFloat(
+      kSettingsSection, "standing_height_meters", &error);
+  if (error == vr::VRSettingsError_None && height > 0.0F) {
+    return static_cast<double>(height);
+  }
+  return 1.5;
+}
+
 bool AllowAmbiguousDisplaySelection() {
   vr::EVRSettingsError error = vr::VRSettingsError_None;
   const bool value = vr::VRSettings()->GetBool(
@@ -185,9 +224,12 @@ vr::EVRInitError DeviceProvider::Init(vr::IVRDriverContext* driver_context) {
 
   const auto sensor = LoadSensorConfig();
   const auto tap_control = LoadTapControlConfig();
+  const auto gaze_dwell = LoadGazeDwellConfig();
+  const auto standing_height = LoadStandingHeight();
   hmd_ = std::make_unique<HmdDevice>(
       config, sensor.address, sensor.stale_pose_timeout,
-      sensor.reconnect_initial, sensor.reconnect_max, tap_control);
+      sensor.reconnect_initial, sensor.reconnect_max, tap_control, gaze_dwell,
+      standing_height);
   if (!vr::VRServerDriverHost()->TrackedDeviceAdded(
           hmd_->SerialNumber().c_str(), vr::TrackedDeviceClass_HMD, hmd_.get())) {
     hmd_.reset();

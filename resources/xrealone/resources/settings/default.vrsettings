@@ -18,6 +18,11 @@
     "tap_input_enabled": false,
     "tap_audio_device": "pulse",
     "tap_audio_peak_threshold": 80000000,
-    "tap_imu_deviation_m_s2": 3.0
+    "tap_imu_deviation_m_s2": 3.0,
+    "standing_height_meters": 1.5,
+    "gaze_dwell_enabled": true,
+    "gaze_dwell_time_ms": 1200,
+    "gaze_dwell_max_angle_deg": 1.5,
+    "gaze_dwell_cooldown_ms": 1500
   }
 }

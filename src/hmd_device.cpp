@@ -20,7 +20,9 @@ HmdDevice::HmdDevice(DisplayConfig display_config, std::string imu_address,
                      const std::chrono::milliseconds stale_pose_timeout,
                      const std::chrono::milliseconds reconnect_initial,
                      const std::chrono::milliseconds reconnect_max,
-                     input::TapControlConfig tap_control_config)
+                     input::TapControlConfig tap_control_config,
+                     input::GazeDwellConfig gaze_dwell_config,
+                     const double standing_height_meters)
     : display_config_(display_config),
       display_component_(display_config),
       imu_address_(std::move(imu_address)),
@@ -28,7 +30,10 @@ HmdDevice::HmdDevice(DisplayConfig display_config, std::string imu_address,
       reconnect_initial_(reconnect_initial),
       reconnect_max_(reconnect_max),
       tap_control_config_(std::move(tap_control_config)),
-      audio_tap_input_(tap_control_config_.audio) {}
+      gaze_dwell_config_(gaze_dwell_config),
+      standing_height_meters_(standing_height_meters),
+      audio_tap_input_(tap_control_config_.audio),
+      gaze_dwell_detector_(gaze_dwell_config_) {}
 
 HmdDevice::~HmdDevice() {
   control_server_.Stop();
@@ -169,8 +174,11 @@ vr::DriverPose_t HmdDevice::GetPose() {
   pose.deviceIsConnected = true;
   pose.result = vr::TrackingResult_Running_OK;
 #endif
+  pose.vecPosition[0] = 0.0;
+  pose.vecPosition[1] = standing_height_meters_;
+  pose.vecPosition[2] = 0.0;
   pose.willDriftInYaw = true;
-  pose.shouldApplyHeadModel = false;
+  pose.shouldApplyHeadModel = true;
   return pose;
 }
 
@@ -180,8 +188,21 @@ void HmdDevice::RunFrame() {
     if (recenter_requested_.exchange(false)) {
       recenter_.SetOrigin(tracking::ParserOrientationToOpenVr(
           pose_store_.Read().orientation));
+      gaze_dwell_detector_.Reset();
       vr::VRDriverLog()->Log("xrealone: orientation recentered");
     }
+
+    const auto pose = GetPose();
+    if (pose.poseIsValid) {
+      const auto orientation = tracking::Quaternion{
+          pose.qRotation.w, pose.qRotation.x, pose.qRotation.y, pose.qRotation.z};
+      if (gaze_dwell_detector_.Observe(std::chrono::steady_clock::now(),
+                                       orientation)) {
+        QueueSelectClick();
+        vr::VRDriverLog()->Log("xrealone: gaze dwell click triggered");
+      }
+    }
+
     if (select_click_handle_ != vr::k_ulInvalidInputComponentHandle) {
       const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                               std::chrono::steady_clock::now().time_since_epoch())
@@ -190,7 +211,7 @@ void HmdDevice::RunFrame() {
       vr::VRDriverInput()->UpdateBooleanComponent(select_click_handle_, pressed,
                                                    0.0);
     }
-    vr::VRServerDriverHost()->TrackedDevicePoseUpdated(index, GetPose(),
+    vr::VRServerDriverHost()->TrackedDevicePoseUpdated(index, pose,
                                                        sizeof(vr::DriverPose_t));
   }
 }

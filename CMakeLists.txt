@@ -21,6 +21,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(vrealone_core STATIC
   src/display_config.cpp
   src/control/control_server.cpp
+  src/input/gaze_dwell_detector.cpp
   src/input/tap_detector.cpp
   src/platform/edid.cpp
   src/tracking/coordinate_transform.cpp
@@ -155,6 +156,7 @@ if(BUILD_TESTING)
     tests/pose_snapshot_tests.cpp
     tests/quaternion_tests.cpp
     tests/recenter_tests.cpp
+    tests/gaze_dwell_detector_tests.cpp
     tests/tap_detector_tests.cpp
   )
   target_link_libraries(vrealone_tests PRIVATE vrealone_core)

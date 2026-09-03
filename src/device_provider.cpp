@@ -4,6 +4,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <sstream>
 #include <string>
 
 #include "platform/edid.hpp"
@@ -155,6 +156,19 @@ bool AllowAmbiguousDisplaySelection() {
 vr::EVRInitError DeviceProvider::Init(vr::IVRDriverContext* driver_context) {
   VR_INIT_SERVER_DRIVER_CONTEXT(driver_context);
   const auto config = LoadDisplayConfig();
+  {
+    std::ostringstream message;
+    message << "xrealone: display config direct_mode="
+            << (config.direct_mode ? "true" : "false")
+            << " on_desktop=" << (config.direct_mode ? "false" : "true")
+            << " real_display=" << (config.direct_mode ? "true" : "false")
+            << " size=" << config.width << 'x' << config.height
+            << " render=" << config.render_width << 'x'
+            << config.render_height << " frequency=" << config.frequency_hz
+            << " edid_vendor=" << config.edid_vendor_id
+            << " edid_product=" << config.edid_product_id;
+    vr::VRDriverLog()->Log(message.str().c_str());
+  }
   if (!config.IsValid()) {
     vr::VRDriverLog()->Log("xrealone: invalid display configuration");
     return vr::VRInitError_Driver_Failed;

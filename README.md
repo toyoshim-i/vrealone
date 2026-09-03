@@ -145,6 +145,11 @@ x64. A Parallels VM can pass the XREAL USB NCM interface through for IMU
 tracking, but its virtual display adapter is a separate compositor dependency;
 see `docs/windows-on-arm.md`.
 
+Native Windows display testing is recorded in `docs/windows-native.md`.
+Windows currently defaults to extended-desktop mode. Reporting the XREAL panel
+as a real, non-desktop display is necessary but was not sufficient to make
+SteamVR acquire it through AMD direct mode on the recorded host.
+
 ## Hardware probes
 
 List DRM connectors and decode their EDID identity:
